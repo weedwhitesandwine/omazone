@@ -47,6 +47,16 @@ o.bind("SUPER + I", "Toggle Omazone", "omarchy-shell shell toggle io.github.weed
 (Or skip this — set it from the panel's own settings view instead; see
 below.)
 
+## Remove
+
+```
+omarchy plugin remove io.github.weedwhitesandwine.omazone
+```
+
+This deletes the plugin and cleans up its bar icon automatically. Your
+tracked cities and settings stay on disk at
+`~/.local/state/omarchy/omazone/` unless you remove that directory too.
+
 ## Usage
 
 - Open/close: your keybind, the bar icon, or
