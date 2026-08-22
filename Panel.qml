@@ -86,14 +86,36 @@ Panel {
     command: ["mkdir", "-p", root.stateDir]
   }
 
+  // settings.json is written here but it lives on disk, where a restored backup
+  // can leave anything at all, and this panel sits in a shell that stays up for
+  // days. FileView cannot stop short of the end of a file, so it no longer does
+  // the reading — it keeps the writing, with blockAllReads set so it never
+  // pulls the file into memory, and `head` does the read with the ceiling in
+  // front of it. A larger file arrives cut off, fails to parse, and leaves the
+  // defaults in place.
+  readonly property int settingsCeiling: 256 * 1024
+
   FileView {
     id: settingsFile
     path: root.settingsPath
     watchChanges: false
     atomicWrites: true
+    blockAllReads: true
+    preload: false
     printErrors: false
-    onLoaded: root.loadSettings(text())
-    onLoadFailed: root.loadSettings("")
+  }
+
+  function readSettings() { settingsReader.running = false; settingsReader.running = true }
+
+  Process {
+    id: settingsReader
+    command: ["head", "-c", String(root.settingsCeiling), "--", root.settingsPath]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.loadSettings(text)
+    }
+    // No settings file yet just means first run; the defaults are the truth.
+    onExited: if (!root.settingsLoaded) root.loadSettings("")
   }
 
   Timer {
@@ -103,13 +125,24 @@ Panel {
     onTriggered: root.flushSettings()
   }
 
+  // A hotkey is modifiers then one key. This value is substituted into
+  // bindings.lua as Lua source, so anything else is refused rather than
+  // escaped — here, and again in set-keybind.sh, since the file can be edited
+  // or restored without going near this panel.
+  readonly property var keybindPattern:
+    /^(SUPER|CTRL|ALT|SHIFT)( \+ (SUPER|CTRL|ALT|SHIFT))* \+ ([A-Z0-9]|F([1-9]|1[0-2]))$/
+
+  function validKeybind(v) {
+    return typeof v === "string" && v.length <= 40 && root.keybindPattern.test(v)
+  }
+
   function loadSettings(json) {
     var parsed = {}
     try { parsed = JSON.parse(json || "{}") } catch (e) { parsed = {} }
     if (Array.isArray(parsed.zoneIds)) root.zoneIds = parsed.zoneIds
     if (parsed.zoneMeta && typeof parsed.zoneMeta === "object") root.zoneMeta = parsed.zoneMeta
     if (typeof parsed.use24h === "boolean") root.use24h = parsed.use24h
-    if (typeof parsed.keybind === "string" && parsed.keybind !== "") root.keybind = parsed.keybind
+    if (root.validKeybind(parsed.keybind)) root.keybind = parsed.keybind
     root.settingsLoaded = true
     root.refreshTimes()
   }
@@ -133,7 +166,7 @@ Panel {
 
   Component.onCompleted: {
     ensureDirsProc.running = true
-    Qt.callLater(function() { settingsFile.reload() })
+    Qt.callLater(function() { root.readSettings() })
   }
 
   function refreshTimes() {
@@ -363,6 +396,7 @@ Panel {
           height: Math.max(titleText.implicitHeight, gearBtn.implicitHeight)
 
           Text {
+            textFormat: Text.PlainText
             id: titleText
             anchors.verticalCenter: parent.verticalCenter
             text: "Omazone"
@@ -413,6 +447,7 @@ Panel {
               height: Math.max(travelLabel.implicitHeight, nowBtn.implicitHeight)
 
               Text {
+                textFormat: Text.PlainText
                 id: travelLabel
                 anchors.verticalCenter: parent.verticalCenter
                 text: Model.formatOffset(root.travelOffsetMinutes)
@@ -450,6 +485,7 @@ Panel {
             }
 
             Text {
+              textFormat: Text.PlainText
               visible: root.travelOffsetMinutes !== 0
               width: parent.width
               text: {
@@ -465,6 +501,7 @@ Panel {
             PanelSeparator { foreground: root.barForeground }
 
             Text {
+              textFormat: Text.PlainText
               visible: root.zoneIds.length === 0
               width: parent.width
               text: "No cities yet — add some from Settings (" + "⚙" + ")."
@@ -538,6 +575,7 @@ Panel {
                     spacing: Style.spacing.sm
 
                     Text {
+                      textFormat: Text.PlainText
                       text: root.zoneIcon(rowItem.modelData)
                       font.pixelSize: Style.font.subtitle
                     }
@@ -547,12 +585,14 @@ Panel {
                       spacing: 2
 
                       Text {
+                        textFormat: Text.PlainText
                         text: root.zoneLabel(rowItem.modelData)
                         color: root.barForeground
                         font.bold: true
                         font.pixelSize: Style.font.body
                       }
                       Text {
+                        textFormat: Text.PlainText
                         text: Model.regionName(rowItem.modelData)
                         color: Qt.darker(root.barForeground, 1.5)
                         font.pixelSize: Style.font.caption
@@ -576,12 +616,14 @@ Panel {
                       spacing: Style.spacing.xs
 
                       Text {
+                        textFormat: Text.PlainText
                         text: root.zoneTimeText(rowItem.modelData)
                         color: root.barForeground
                         font.bold: true
                         font.pixelSize: Style.font.subtitle
                       }
                       Text {
+                        textFormat: Text.PlainText
                         visible: text !== ""
                         text: root.zoneBadge(rowItem.modelData)
                         color: Color.accent
@@ -591,6 +633,7 @@ Panel {
                     }
 
                     Text {
+                      textFormat: Text.PlainText
                       anchors.right: parent.right
                       text: root.zoneSubText(rowItem.modelData)
                       color: Qt.darker(root.barForeground, 1.5)
@@ -690,6 +733,7 @@ Panel {
             }
 
             Text {
+              textFormat: Text.PlainText
               visible: root.recording
               text: "Press a shortcut with one modifier (e.g. Super+T). Esc to cancel."
               color: Qt.darker(root.barForeground, 1.4)
@@ -699,6 +743,7 @@ Panel {
             }
 
             Text {
+              textFormat: Text.PlainText
               visible: root.recordError !== ""
               text: root.recordError
               color: Color.urgent
@@ -726,12 +771,14 @@ Panel {
             }
 
             Text {
+              textFormat: Text.PlainText
               visible: root.applyStatus === "applying"
               text: "Applying…"
               color: Qt.darker(root.barForeground, 1.4)
               font.pixelSize: Style.font.bodySmall
             }
             Text {
+              textFormat: Text.PlainText
               visible: root.applyStatus === "error"
               text: "Failed: " + root.applyError
               color: Color.urgent
