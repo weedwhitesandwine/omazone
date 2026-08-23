@@ -55,7 +55,6 @@ Panel {
   property var zoneIds: []
   property var zoneMeta: ({})
   property bool use24h: true
-  property string keybind: "SUPER + I"
   property string barSection: "right"
   property bool settingsLoaded: false
 
@@ -66,12 +65,6 @@ Panel {
 
   property int travelOffsetMinutes: 0
   property var zoneTimes: ({})
-
-  property bool recording: false
-  property string pendingCombo: ""
-  property string recordError: ""
-  property string applyStatus: ""
-  property string applyError: ""
 
   function open() {
     root.travelOffsetMinutes = 0
@@ -84,9 +77,6 @@ Panel {
   }
 
   function close() {
-    // Clears a half-recorded shortcut and any error banner with it, so
-    // reopening Settings does not show the failure from last time.
-    root.cancelRecording()
     root.editingId = ""
     root.controller.hide()
   }
@@ -172,24 +162,12 @@ Panel {
     onTriggered: root.flushSettings()
   }
 
-  // A hotkey is modifiers then one key. This value is substituted into
-  // bindings.lua as Lua source, so anything else is refused rather than
-  // escaped — here, and again in set-keybind.sh, since the file can be edited
-  // or restored without going near this panel.
-  readonly property var keybindPattern:
-    /^(SUPER|CTRL|ALT|SHIFT)( \+ (SUPER|CTRL|ALT|SHIFT))* \+ ([A-Z0-9]|F([1-9]|1[0-2])|SPACE|RETURN|ENTER|TAB|ESCAPE|BACKSPACE|DELETE|INSERT|HOME|END|PAGE_UP|PAGE_DOWN|UP|DOWN|LEFT|RIGHT|COMMA|PERIOD|SLASH|MINUS|EQUAL|SEMICOLON|APOSTROPHE|GRAVE|BRACKETLEFT|BRACKETRIGHT|BACKSLASH)$/
-
-  function validKeybind(v) {
-    return typeof v === "string" && v.length <= 40 && root.keybindPattern.test(v)
-  }
-
   function loadSettings(json) {
     var parsed = {}
     try { parsed = JSON.parse(json || "{}") } catch (e) { parsed = {} }
     if (Array.isArray(parsed.zoneIds)) root.zoneIds = parsed.zoneIds
     if (parsed.zoneMeta && typeof parsed.zoneMeta === "object") root.zoneMeta = parsed.zoneMeta
     if (typeof parsed.use24h === "boolean") root.use24h = parsed.use24h
-    if (root.validKeybind(parsed.keybind)) root.keybind = parsed.keybind
     if (["left", "center", "right"].indexOf(parsed.barSection) >= 0) root.barSection = parsed.barSection
     root.settingsLoaded = true
     root.refreshTimes()
@@ -219,13 +197,11 @@ Panel {
       zoneIds: root.zoneIds,
       zoneMeta: root.zoneMeta,
       use24h: root.use24h,
-      keybind: root.keybind,
       barSection: root.barSection
     }, null, 2) + "\n")
   }
 
   onUse24hChanged: scheduleSettingsSave()
-  onKeybindChanged: scheduleSettingsSave()
   onZoneMetaChanged: scheduleSettingsSave()
   onBarSectionChanged: scheduleSettingsSave()
 
@@ -337,134 +313,6 @@ Panel {
     root.zoneIds = ids
   }
 
-  function isBareModifier(key) {
-    return key === Qt.Key_Super_L || key === Qt.Key_Super_R || key === Qt.Key_Meta
-      || key === Qt.Key_Control || key === Qt.Key_Shift || key === Qt.Key_Alt || key === Qt.Key_AltGr
-  }
-
-  // Spelled the way both validators accept, not the way Hyprland prints them:
-  // the recorder invites the user to press these keys, so a name that is then
-  // refused on Apply makes the invitation a lie.
-  function hyprKeyName(key) {
-    if (key >= Qt.Key_A && key <= Qt.Key_Z) return String.fromCharCode(key)
-    if (key >= Qt.Key_0 && key <= Qt.Key_9) return String.fromCharCode(key)
-    if (key >= Qt.Key_F1 && key <= Qt.Key_F12) return "F" + (key - Qt.Key_F1 + 1)
-    var names = {}
-    names[Qt.Key_Space] = "SPACE"
-    names[Qt.Key_Return] = "RETURN"
-    names[Qt.Key_Enter] = "RETURN"
-    names[Qt.Key_Escape] = "ESCAPE"
-    names[Qt.Key_Tab] = "TAB"
-    names[Qt.Key_Backspace] = "BACKSPACE"
-    names[Qt.Key_Delete] = "DELETE"
-    names[Qt.Key_Home] = "HOME"
-    names[Qt.Key_End] = "END"
-    names[Qt.Key_PageUp] = "PAGE_UP"
-    names[Qt.Key_PageDown] = "PAGE_DOWN"
-    names[Qt.Key_Left] = "LEFT"
-    names[Qt.Key_Right] = "RIGHT"
-    names[Qt.Key_Up] = "UP"
-    names[Qt.Key_Down] = "DOWN"
-    names[Qt.Key_Comma] = "COMMA"
-    names[Qt.Key_Period] = "PERIOD"
-    names[Qt.Key_Minus] = "MINUS"
-    names[Qt.Key_Equal] = "EQUAL"
-    names[Qt.Key_Slash] = "SLASH"
-    names[Qt.Key_Backslash] = "BACKSLASH"
-    names[Qt.Key_Semicolon] = "SEMICOLON"
-    names[Qt.Key_Apostrophe] = "APOSTROPHE"
-    names[Qt.Key_BracketLeft] = "BRACKETLEFT"
-    names[Qt.Key_BracketRight] = "BRACKETRIGHT"
-    names[Qt.Key_QuoteLeft] = "GRAVE"
-    return names[key] || ""
-  }
-
-  function beginRecording() {
-    root.recording = true
-    root.recordError = ""
-    root.pendingCombo = ""
-    root.applyStatus = ""
-    Qt.callLater(function() { recorder.forceActiveFocus() })
-  }
-
-  function cancelRecording() {
-    root.recording = false
-    root.recordError = ""
-    root.pendingCombo = ""
-  }
-
-  function handleRecordKey(event) {
-    if (event.key === Qt.Key_Escape && event.modifiers === Qt.NoModifier) {
-      root.cancelRecording()
-      event.accepted = true
-      return
-    }
-    if (root.isBareModifier(event.key)) {
-      event.accepted = true
-      return
-    }
-
-    var mods = []
-    if (event.modifiers & Qt.MetaModifier) mods.push("SUPER")
-    if (event.modifiers & Qt.ControlModifier) mods.push("CTRL")
-    if (event.modifiers & Qt.AltModifier) mods.push("ALT")
-    if (event.modifiers & Qt.ShiftModifier) mods.push("SHIFT")
-
-    var keyStr = root.hyprKeyName(event.key)
-    if (keyStr === "") {
-      root.recordError = "Unsupported key — try a letter, digit, F-key, arrow, or punctuation key."
-      event.accepted = true
-      return
-    }
-    // Shift on its own does not qualify: "SHIFT + T" binds capital T globally,
-    // so typing one anywhere would open the panel. The same hole was found in
-    // the sibling plugins.
-    if (mods.length === 1 && mods[0] === "SHIFT") {
-      root.recordError = "Shift on its own is not enough — hold Super, Ctrl or Alt as well, or a capital letter would open this everywhere."
-      event.accepted = true
-      return
-    }
-    if (mods.length === 0) {
-      root.recordError = "Add a modifier (Super, Ctrl or Alt) — a bare key would break typing everywhere."
-      event.accepted = true
-      return
-    }
-    if (mods.length > 1) {
-      root.recordError = "Use exactly one modifier — combos with two or more fail to apply on this system."
-      event.accepted = true
-      return
-    }
-
-    root.recordError = ""
-    root.pendingCombo = mods.join(" ") + " + " + keyStr
-    event.accepted = true
-  }
-
-  function confirmRecording() {
-    if (root.pendingCombo === "") return
-    root.applyStatus = "applying"
-    root.applyError = ""
-    keybindProc.command = ["bash", root.pluginDir + "/set-keybind.sh", root.pendingCombo]
-    keybindProc.running = true
-  }
-
-  Process {
-    id: keybindProc
-    stdout: StdioCollector { id: keybindStdout; waitForEnd: true }
-    stderr: StdioCollector { id: keybindStderr; waitForEnd: true }
-    onExited: function(exitCode) {
-      if (exitCode === 0) {
-        root.keybind = root.pendingCombo
-        root.applyStatus = ""
-        root.recording = false
-        root.pendingCombo = ""
-      } else {
-        root.applyStatus = "error"
-        root.applyError = (keybindStderr.text || "").trim() || "Failed to apply keybind"
-      }
-    }
-  }
-
   KeyboardPanel {
     id: panel
     anchorItem: root.anchorItem
@@ -473,12 +321,14 @@ Panel {
     open: root.opened
     focusTarget: keyCatcher
     contentWidth: panel.fittedContentWidth(Style.space(360))
-    contentHeight: panel.fittedContentHeight(Style.space(460))
+    // Settings is the taller of the two views, so the card is given the room
+    // when it is showing and stays compact for the clock list.
+    contentHeight: panel.fittedContentHeight(Style.space(root.settingsOpen ? 560 : 460))
 
     PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
-      blocked: root.recording || root.editingId !== ""
+      blocked: root.editingId !== ""
       onCloseRequested: root.close()
       onTabRequested: function(direction) { root.switchPanel(direction) }
 
@@ -862,80 +712,6 @@ Panel {
               }
             }
 
-            PanelSeparator { foreground: root.barForeground }
-
-            PanelSectionHeader { text: "KEYBIND"; foreground: root.barForeground }
-
-            Button {
-              text: root.recording ? (root.pendingCombo !== "" ? root.pendingCombo : "Press keys…") : root.keybind
-              bordered: true
-              foreground: root.barForeground
-              fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
-              onClicked: root.recording ? root.cancelRecording() : root.beginRecording()
-            }
-
-            Item {
-              id: recorder
-              width: 1
-              height: 1
-              focus: root.recording
-              Keys.onPressed: function(event) { root.handleRecordKey(event) }
-            }
-
-            Text {
-              textFormat: Text.PlainText
-              visible: root.recording
-              text: "Press a shortcut with one modifier (e.g. Super+T). Esc to cancel."
-              color: Qt.darker(root.barForeground, 1.4)
-              font.pixelSize: Style.font.bodySmall
-              wrapMode: Text.Wrap
-              width: parent.width
-            }
-
-            Text {
-              textFormat: Text.PlainText
-              visible: root.recordError !== ""
-              text: root.recordError
-              color: Color.urgent
-              font.pixelSize: Style.font.bodySmall
-              wrapMode: Text.Wrap
-              width: parent.width
-            }
-
-            Row {
-              visible: root.recording && root.pendingCombo !== ""
-              spacing: Style.spacing.sm
-
-              Button {
-                text: "Apply"
-                bordered: true
-                foreground: root.barForeground
-                onClicked: root.confirmRecording()
-              }
-              Button {
-                text: "Cancel"
-                bordered: true
-                foreground: root.barForeground
-                onClicked: root.cancelRecording()
-              }
-            }
-
-            Text {
-              textFormat: Text.PlainText
-              visible: root.applyStatus === "applying"
-              text: "Applying…"
-              color: Qt.darker(root.barForeground, 1.4)
-              font.pixelSize: Style.font.bodySmall
-            }
-            Text {
-              textFormat: Text.PlainText
-              visible: root.applyStatus === "error"
-              text: "Failed: " + root.applyError
-              color: Color.urgent
-              font.pixelSize: Style.font.bodySmall
-              wrapMode: Text.Wrap
-              width: parent.width
-            }
           }
         }
       }

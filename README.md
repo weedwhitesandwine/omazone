@@ -21,8 +21,6 @@ at once.
 - 12-hour or 24-hour display, your choice.
 - Reorder cities, or remove ones you no longer need.
 - Optional status-bar icon that drops the panel down right under it.
-- The toggle keybind is rebindable from inside the panel itself — no manual
-  editing of Hyprland config required.
 
 ## Install
 
@@ -48,8 +46,8 @@ Add a keybind, e.g. in `~/.config/hypr/bindings.lua`:
 o.bind("SUPER + I", "Toggle Omazone", "omarchy-shell shell toggle io.github.weedwhitesandwine.omazone")
 ```
 
-(Or skip this — set it from the panel's own settings view instead; see
-below.)
+Change it whenever you like — it is an ordinary line in your own config, and
+Omazone never touches it.
 
 ## Remove
 
@@ -63,13 +61,11 @@ tracked cities and settings stay on disk at
 
 ## Usage
 
-- Open/close: your keybind, the bar icon, or
+- Open/close: the bar icon, the shortcut you added at install, or
   `omarchy-shell shell toggle io.github.weedwhitesandwine.omazone`.
 - Click the gear icon (top-right of the panel) to open settings:
   - **Cities** — search and check off any number of timezones to track.
   - **Format** — 12-hour or 24-hour time.
-  - **Keybind** — click the current combo, press a new one (exactly one
-    modifier — Super, Ctrl, Alt, or Shift), click Apply.
 - On each city row: `↑`/`↓` reorder it, `✎` edit its icon and label, `✕`
   removes it.
 - The Time Travel slider ranges from 24 hours in the past to 48 hours
@@ -77,39 +73,26 @@ tracked cities and settings stay on disk at
 
 ## External dependencies and system-level modifications
 
-This plugin runs `bash`, `date`, `timedatectl`, `jq`, `hyprctl`, `python3` and
-`omarchy` via Quickshell's `Process` — all standard on any Omarchy install, no
+This plugin runs `bash`, `date`, `timedatectl`, `jq`, `python3` and `omarchy`
+via Quickshell's `Process` — all standard on any Omarchy install, no
 extra packages required. `python3` is what reads the settings file back: it
 opens it refusing symlinks and anything that is not a plain file, refuses to
 wait on a pipe, and reports a file it would not read rather than returning it
 empty. Times are computed with the system's own `date`/tzdata,
 not looked up over the network — Omazone works fully offline.
 
-**The keybind picker in Settings modifies `~/.config/hypr/bindings.lua`.**
-When you record and apply a new shortcut, `set-keybind.sh`:
+**Omazone does not edit your Hyprland configuration.** The shortcut is yours
+to add and to change, in `~/.config/hypr/bindings.lua`, using the line in
+**Install** above. Nothing in this plugin reads or writes that file.
 
-1. Copies `bindings.lua` to a backup beside it, under a random name created
-   exclusively so nothing can have been planted at it, and removes that copy
-   when the script exits. The backup exists to undo a bad edit, not to
-   accumulate.
-2. Rewrites the specific `o.bind(...)` line that toggles Omazone, identified
-   by matching the exact `omarchy-shell shell toggle
-   io.github.weedwhitesandwine.omazone` command string — no other line is
-   touched.
-3. Runs `hyprctl reload` and checks `hyprctl configerrors`.
-4. If the reload produces a config error that was not already there before the
-   edit, restores the backup and reloads again — a bad rebind can't leave
-   Hyprland in a broken state, and an unrelated error you already had does not
-   make every rebind undo itself.
-
-This is the only system configuration file this plugin ever writes to, and
-only in response to an explicit action in the settings view (never
-automatically).
+Outside its own state directory, the only file Omazone writes is
+`~/.config/omarchy/shell.json`, and only its own `{"id": …}` entry, when you
+show or hide the bar icon from the settings view.
 
 ## State files
 
 - `~/.local/state/omarchy/omazone/settings.json` — tracked cities, their
-  custom icons/labels, 12/24-hour preference, and the keybind. Created on
+  custom icons/labels and the 12/24-hour preference. Created on
   first change; starts empty until you add cities from Settings.
 
 ## License
