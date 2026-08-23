@@ -22,6 +22,7 @@ Panel {
   property var zoneMeta: ({})
   property bool use24h: true
   property string keybind: "SUPER + I"
+  property string barSection: "right"
   property bool settingsLoaded: false
 
   property bool settingsOpen: false
@@ -143,6 +144,7 @@ Panel {
     if (parsed.zoneMeta && typeof parsed.zoneMeta === "object") root.zoneMeta = parsed.zoneMeta
     if (typeof parsed.use24h === "boolean") root.use24h = parsed.use24h
     if (root.validKeybind(parsed.keybind)) root.keybind = parsed.keybind
+    if (["left", "center", "right"].indexOf(parsed.barSection) >= 0) root.barSection = parsed.barSection
     root.settingsLoaded = true
     root.refreshTimes()
   }
@@ -156,13 +158,34 @@ Panel {
       zoneIds: root.zoneIds,
       zoneMeta: root.zoneMeta,
       use24h: root.use24h,
-      keybind: root.keybind
+      keybind: root.keybind,
+      barSection: root.barSection
     }, null, 2) + "\n")
   }
 
   onUse24hChanged: scheduleSettingsSave()
   onKeybindChanged: scheduleSettingsSave()
   onZoneMetaChanged: scheduleSettingsSave()
+  onBarSectionChanged: scheduleSettingsSave()
+
+  // Move the bar icon to the chosen section through Omarchy's own bar CLI, so
+  // the shell owns the edit to its own config. Arguments are passed as a
+  // vector, never interpolated. Only ever run in response to the user picking
+  // a placement — never on load, so opening the panel does not touch the bar.
+  function applyBarSection(sec) {
+    if (["left", "center", "right"].indexOf(sec) < 0) return
+    root.barSection = sec
+    barSectionProc.command = ["omarchy", "bar", "move",
+                              "io.github.weedwhitesandwine.omazone", "--section", sec]
+    barSectionProc.running = false
+    barSectionProc.running = true
+  }
+
+  Process {
+    id: barSectionProc
+    stdout: StdioCollector { waitForEnd: true }
+    stderr: StdioCollector { waitForEnd: true }
+  }
 
   Component.onCompleted: {
     ensureDirsProc.running = true
@@ -710,6 +733,50 @@ Panel {
               checked: root.use24h
               foreground: root.barForeground
               onClicked: root.use24h = !root.use24h
+            }
+
+            PanelSeparator { foreground: root.barForeground }
+
+            PanelSectionHeader { text: "BAR"; foreground: root.barForeground }
+
+            Text {
+              textFormat: Text.PlainText
+              width: parent.width
+              text: "Which side of the bar the Omazone icon sits on."
+              color: Qt.darker(root.barForeground, 1.5)
+              font.pixelSize: Style.font.bodySmall
+              wrapMode: Text.Wrap
+            }
+
+            Row {
+              width: parent.width
+              spacing: Style.spacing.xs
+              readonly property real btnW: (width - Style.spacing.xs * 2) / 3
+
+              Button {
+                width: parent.btnW
+                text: "Left"
+                bordered: root.barSection === "left"
+                foreground: root.barForeground
+                fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
+                onClicked: root.applyBarSection("left")
+              }
+              Button {
+                width: parent.btnW
+                text: "Center"
+                bordered: root.barSection === "center"
+                foreground: root.barForeground
+                fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
+                onClicked: root.applyBarSection("center")
+              }
+              Button {
+                width: parent.btnW
+                text: "Right"
+                bordered: root.barSection === "right"
+                foreground: root.barForeground
+                fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
+                onClicked: root.applyBarSection("right")
+              }
             }
 
             PanelSeparator { foreground: root.barForeground }

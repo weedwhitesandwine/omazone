@@ -32,11 +32,15 @@ omarchy plugin add https://github.com/weedwhitesandwine/omazone.git --enable
 
 Run in a real terminal, this asks which bar section to place the icon in
 (left/center/right, right pre-selected) before enabling it — the same
-prompt any other bar-widget plugin gives you. Change your mind later with:
+prompt any other bar-widget plugin gives you. Change your mind later from the
+panel's **Settings → BAR** section (Left / Center / Right), or from a terminal:
 
 ```
 omarchy bar move io.github.weedwhitesandwine.omazone --section left
 ```
+
+The Settings buttons run exactly that `omarchy bar move` command, so the shell
+makes the change to its own layout.
 
 Add a keybind, e.g. in `~/.config/hypr/bindings.lua`:
 

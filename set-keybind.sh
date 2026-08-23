@@ -14,6 +14,13 @@ fi
 FILE="$HOME/.config/hypr/bindings.lua"
 MARKER='omarchy-shell shell toggle io.github.weedwhitesandwine.omazone'
 
+# Refuse to work through a symlink at bindings.lua before reading it: an edit
+# that followed one would read and then rewrite whatever it pointed at.
+if [ -L "$FILE" ]; then
+  echo "ERROR: $FILE is a symlink; refusing to edit it" >&2
+  exit 2
+fi
+
 if [ ! -f "$FILE" ]; then
   echo "ERROR: $FILE not found" >&2
   exit 2
@@ -24,15 +31,24 @@ if ! grep -qF "$MARKER" "$FILE"; then
   exit 2
 fi
 
-BACKUP="$FILE.bak.$(date +%s)"
+# The backup and the staged edit both live in the same directory as the
+# config, under unpredictable names created exclusively by mktemp (never
+# following a symlink), so nothing can have been planted at either name, and
+# the rename that swaps the edit in is a single atomic step on the same
+# filesystem.
+DIR=$(dirname "$FILE")
+BACKUP=$(mktemp "$DIR/.bindings.bak.XXXXXXXX")
+TMP=$(mktemp "$DIR/.bindings.tmp.XXXXXXXX")
+trap 'rm -f "$BACKUP" "$TMP"' EXIT
 cp "$FILE" "$BACKUP"
+chmod --reference="$FILE" "$TMP" 2>/dev/null || true
 
 awk -v marker="$MARKER" -v combo="$NEWCOMBO" '
   index($0, marker) {
     sub(/o\.bind\("[^"]*"/, "o.bind(\"" combo "\"")
   }
   { print }
-' "$FILE" > "$FILE.tmp" && mv "$FILE.tmp" "$FILE"
+' "$FILE" > "$TMP" && mv -f "$TMP" "$FILE"
 
 hyprctl reload >/dev/null
 

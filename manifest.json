@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.weedwhitesandwine.omazone",
   "name": "Omazone",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "weedwhitesandwine",
   "license": "MIT",
   "description": "A multi-timezone clock that drops down from the bar. Track any number of cities with custom labels and icons, drag the Time Travel slider to preview a future moment across all of them at once, and rebind the toggle keybind from the settings view. Summon with: omarchy-shell shell toggle io.github.weedwhitesandwine.omazone",
