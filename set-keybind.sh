@@ -43,20 +43,52 @@ trap 'rm -f "$BACKUP" "$TMP"' EXIT
 cp "$FILE" "$BACKUP"
 chmod --reference="$FILE" "$TMP" 2>/dev/null || true
 
-awk -v marker="$MARKER" -v combo="$NEWCOMBO" '
+# What Hyprland was already unhappy about before this edit. Reverting on "any
+# error at all" means one unrelated, pre-existing mistake elsewhere in the
+# config makes every rebind here silently undo itself and blame this plugin.
+BEFORE="$(hyprctl configerrors 2>/dev/null || true)"
+
+# The marker only proves the toggle command is somewhere in the file, not that
+# there is an `o.bind("…")` on that line to rewrite. Count the substitutions,
+# so a file that was written some other way is refused rather than reported as
+# a success that changed nothing.
+CHANGED=$(awk -v marker="$MARKER" -v combo="$NEWCOMBO" '
   index($0, marker) {
-    sub(/o\.bind\("[^"]*"/, "o.bind(\"" combo "\"")
+    n += sub(/o\.bind\("[^"]*"/, "o.bind(\"" combo "\"")
   }
-  { print }
-' "$FILE" > "$TMP" && mv -f "$TMP" "$FILE"
+  { print > tmp }
+  END { print n + 0 > "/dev/stderr" }
+' tmp="$TMP" "$FILE" 2>&1 >/dev/null) || CHANGED=0
 
-hyprctl reload >/dev/null
+if [ "${CHANGED:-0}" -lt 1 ]; then
+  echo "ERROR: found the Omazone line but no o.bind(\"…\") on it to change" >&2
+  exit 2
+fi
+mv -f "$TMP" "$FILE"
 
-ERRS="$(hyprctl configerrors)"
-if [ -n "$ERRS" ]; then
+# Past this point the file on disk has changed, so every failure has to put it
+# back. `set -e` would abort before the revert and the EXIT trap would then
+# delete the backup, leaving the config edited, unverified and unrecoverable.
+restore() {
   cp "$BACKUP" "$FILE"
-  hyprctl reload >/dev/null
-  echo "ERROR: $ERRS" >&2
+  hyprctl reload >/dev/null 2>&1 || true
+}
+
+if ! hyprctl reload >/dev/null 2>&1; then
+  restore
+  echo "ERROR: could not ask Hyprland to reload; the shortcut was put back" >&2
+  exit 1
+fi
+
+if ! AFTER="$(hyprctl configerrors 2>/dev/null)"; then
+  restore
+  echo "ERROR: could not read Hyprland's config errors; the shortcut was put back" >&2
+  exit 1
+fi
+
+if [ -n "$AFTER" ] && [ "$AFTER" != "$BEFORE" ]; then
+  restore
+  echo "ERROR: $AFTER" >&2
   exit 1
 fi
 

@@ -21,22 +21,26 @@ Panel {
     'path = sys.argv[1]; ceiling = int(sys.argv[2])',
     'try:',
     '    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)',
+    'except FileNotFoundError:',
+    '    raise SystemExit(2)',
     'except OSError:',
-    '    raise SystemExit',
-    'raw = b""',
+    '    raise SystemExit(1)',
     'try:',
-    '    if stat.S_ISREG(os.fstat(fd).st_mode):',
-    '        with os.fdopen(fd, "rb") as handle:',
-    '            fd = None',
-    '            raw = handle.read(ceiling + 1)',
+    '    if not stat.S_ISREG(os.fstat(fd).st_mode):',
+    '        raise SystemExit(1)',
+    '    with os.fdopen(fd, "rb") as handle:',
+    '        fd = None',
+    '        raw = handle.read(ceiling + 1)',
     'except OSError:',
-    '    raw = b""',
+    '    raise SystemExit(1)',
     'finally:',
     '    if fd is not None:',
     '        os.close(fd)',
-    'if raw and len(raw) <= ceiling:',
-    '    sys.stdout.buffer.write(raw)'
-  ].join("\n")
+    'if len(raw) > ceiling:',
+    '    raise SystemExit(1)',
+    'sys.stdout.buffer.write(raw)'
+  ].join("
+")
   moduleName: "io.github.weedwhitesandwine.omazone"
   manageIpc: false
 
@@ -74,11 +78,15 @@ Panel {
     root.settingsOpen = false
     root.editingId = ""
     root.controller.show()
-    root.refreshTimes()
+    // After the show, so `opened` has settled — refreshTimes() declines to do
+    // anything while the panel is closed.
+    Qt.callLater(root.refreshTimes)
   }
 
   function close() {
-    root.recording = false
+    // Clears a half-recorded shortcut and any error banner with it, so
+    // reopening Settings does not show the failure from last time.
+    root.cancelRecording()
     root.editingId = ""
     root.controller.hide()
   }
@@ -129,7 +137,15 @@ Panel {
   FileView {
     id: settingsFile
     path: root.settingsPath
-    watchChanges: false
+    // There is one panel per monitor, each with its own copy of these
+    // settings, and each writes the whole file. Without watching, the second
+    // screen's panel never sees the first one's save and writes its stale copy
+    // straight back over it. Our own writes are skipped.
+    watchChanges: true
+    onFileChanged: {
+      if (root.savingNow) { root.savingNow = false; return }
+      root.readSettings()
+    }
     atomicWrites: true
     blockAllReads: true
     preload: false
@@ -144,10 +160,9 @@ Panel {
               root.settingsPath, String(root.settingsCeiling)]
     stdout: StdioCollector {
       waitForEnd: true
-      onStreamFinished: root.loadSettings(text)
+      onStreamFinished: if (text !== "") root.loadSettings(text)
     }
-    // No settings file yet just means first run; the defaults are the truth.
-    onExited: if (!root.settingsLoaded) root.loadSettings("")
+    onExited: function(code) { root.settingsReadFinished(code) }
   }
 
   Timer {
@@ -180,11 +195,26 @@ Panel {
     root.refreshTimes()
   }
 
+  // Saving is gated on having loaded first, so that a panel cannot write its
+  // in-memory defaults over settings it has not seen. That gate is only safe
+  // if the three outcomes are told apart: the reader exits 2 when there is no
+  // file yet (defaults ARE the truth, so load them and allow saving), 0 when
+  // it read one, and 1 when it refused — too large, not a plain file, a link,
+  // unreadable. A refusal leaves the gate shut on purpose: the one thing worse
+  // than not saving this session is overwriting a file we could not read.
+  function settingsReadFinished(code) {
+    if (root.settingsLoaded) return
+    if (code === 2) root.loadSettings("")
+  }
+
+  property bool savingNow: false
+
   function scheduleSettingsSave() {
     if (root.settingsLoaded) settingsSaveTimer.restart()
   }
 
   function flushSettings() {
+    root.savingNow = true
     settingsFile.setText(JSON.stringify({
       zoneIds: root.zoneIds,
       zoneMeta: root.zoneMeta,
@@ -312,6 +342,9 @@ Panel {
       || key === Qt.Key_Control || key === Qt.Key_Shift || key === Qt.Key_Alt || key === Qt.Key_AltGr
   }
 
+  // Spelled the way both validators accept, not the way Hyprland prints them:
+  // the recorder invites the user to press these keys, so a name that is then
+  // refused on Apply makes the invitation a lie.
   function hyprKeyName(key) {
     if (key >= Qt.Key_A && key <= Qt.Key_Z) return String.fromCharCode(key)
     if (key >= Qt.Key_0 && key <= Qt.Key_9) return String.fromCharCode(key)
@@ -323,26 +356,26 @@ Panel {
     names[Qt.Key_Escape] = "ESCAPE"
     names[Qt.Key_Tab] = "TAB"
     names[Qt.Key_Backspace] = "BACKSPACE"
-    names[Qt.Key_Delete] = "Delete"
-    names[Qt.Key_Home] = "Home"
-    names[Qt.Key_End] = "End"
-    names[Qt.Key_PageUp] = "PageUp"
-    names[Qt.Key_PageDown] = "PageDown"
-    names[Qt.Key_Left] = "left"
-    names[Qt.Key_Right] = "right"
-    names[Qt.Key_Up] = "up"
-    names[Qt.Key_Down] = "down"
-    names[Qt.Key_Comma] = "comma"
-    names[Qt.Key_Period] = "period"
-    names[Qt.Key_Minus] = "minus"
-    names[Qt.Key_Equal] = "equal"
-    names[Qt.Key_Slash] = "slash"
-    names[Qt.Key_Backslash] = "backslash"
-    names[Qt.Key_Semicolon] = "semicolon"
-    names[Qt.Key_Apostrophe] = "apostrophe"
-    names[Qt.Key_BracketLeft] = "bracketleft"
-    names[Qt.Key_BracketRight] = "bracketright"
-    names[Qt.Key_QuoteLeft] = "grave"
+    names[Qt.Key_Delete] = "DELETE"
+    names[Qt.Key_Home] = "HOME"
+    names[Qt.Key_End] = "END"
+    names[Qt.Key_PageUp] = "PAGE_UP"
+    names[Qt.Key_PageDown] = "PAGE_DOWN"
+    names[Qt.Key_Left] = "LEFT"
+    names[Qt.Key_Right] = "RIGHT"
+    names[Qt.Key_Up] = "UP"
+    names[Qt.Key_Down] = "DOWN"
+    names[Qt.Key_Comma] = "COMMA"
+    names[Qt.Key_Period] = "PERIOD"
+    names[Qt.Key_Minus] = "MINUS"
+    names[Qt.Key_Equal] = "EQUAL"
+    names[Qt.Key_Slash] = "SLASH"
+    names[Qt.Key_Backslash] = "BACKSLASH"
+    names[Qt.Key_Semicolon] = "SEMICOLON"
+    names[Qt.Key_Apostrophe] = "APOSTROPHE"
+    names[Qt.Key_BracketLeft] = "BRACKETLEFT"
+    names[Qt.Key_BracketRight] = "BRACKETRIGHT"
+    names[Qt.Key_QuoteLeft] = "GRAVE"
     return names[key] || ""
   }
 
@@ -383,8 +416,16 @@ Panel {
       event.accepted = true
       return
     }
+    // Shift on its own does not qualify: "SHIFT + T" binds capital T globally,
+    // so typing one anywhere would open the panel. The same hole was found in
+    // the sibling plugins.
+    if (mods.length === 1 && mods[0] === "SHIFT") {
+      root.recordError = "Shift on its own is not enough — hold Super, Ctrl or Alt as well, or a capital letter would open this everywhere."
+      event.accepted = true
+      return
+    }
     if (mods.length === 0) {
-      root.recordError = "Add a modifier (Super/Ctrl/Alt/Shift) — a bare key would break typing everywhere."
+      root.recordError = "Add a modifier (Super, Ctrl or Alt) — a bare key would break typing everywhere."
       event.accepted = true
       return
     }
@@ -740,8 +781,14 @@ Panel {
             PanelSectionHeader { text: "CITIES"; foreground: root.barForeground }
 
             MultiSelect {
+              id: cityPicker
               width: parent.width
               label: "Track these cities"
+              // Assigned, not bound: MultiSelect writes to its own `values`
+              // when a city is ticked, which destroys a binding to it. After
+              // that the picker and the saved list drift apart — removed
+              // cities come back, and reordering is discarded on the next
+              // change. The Connections below keeps it in step instead.
               values: root.zoneIds
               optionsCommand: ["bash", root.pluginDir + "/list-zones.sh"]
               placeholderText: "Search timezones…"
@@ -751,6 +798,11 @@ Panel {
               accent: Color.accent
               fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
               onChanged: function(values) { root.zoneIds = values }
+            }
+
+            Connections {
+              target: root
+              function onZoneIdsChanged() { cityPicker.values = root.zoneIds }
             }
 
             PanelSeparator { foreground: root.barForeground }

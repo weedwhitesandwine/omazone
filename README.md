@@ -77,23 +77,30 @@ tracked cities and settings stay on disk at
 
 ## External dependencies and system-level modifications
 
-This plugin runs `bash`, `date`, `timedatectl`, `jq`, and `hyprctl` via
-Quickshell's `Process` — all standard on any Omarchy install, no extra
-packages required. Times are computed with the system's own `date`/tzdata,
+This plugin runs `bash`, `date`, `timedatectl`, `jq`, `hyprctl`, `python3` and
+`omarchy` via Quickshell's `Process` — all standard on any Omarchy install, no
+extra packages required. `python3` is what reads the settings file back: it
+opens it refusing symlinks and anything that is not a plain file, refuses to
+wait on a pipe, and reports a file it would not read rather than returning it
+empty. Times are computed with the system's own `date`/tzdata,
 not looked up over the network — Omazone works fully offline.
 
 **The keybind picker in Settings modifies `~/.config/hypr/bindings.lua`.**
 When you record and apply a new shortcut, `set-keybind.sh`:
 
-1. Backs up `bindings.lua` to `bindings.lua.bak.<unix-timestamp>` (not
-   auto-deleted — clean these up yourself periodically if you rebind often).
+1. Copies `bindings.lua` to a backup beside it, under a random name created
+   exclusively so nothing can have been planted at it, and removes that copy
+   when the script exits. The backup exists to undo a bad edit, not to
+   accumulate.
 2. Rewrites the specific `o.bind(...)` line that toggles Omazone, identified
    by matching the exact `omarchy-shell shell toggle
    io.github.weedwhitesandwine.omazone` command string — no other line is
    touched.
 3. Runs `hyprctl reload` and checks `hyprctl configerrors`.
-4. If the reload produces any config error, restores the backup and reloads
-   again — a bad rebind can't leave Hyprland in a broken state.
+4. If the reload produces a config error that was not already there before the
+   edit, restores the backup and reloads again — a bad rebind can't leave
+   Hyprland in a broken state, and an unrelated error you already had does not
+   make every rebind undo itself.
 
 This is the only system configuration file this plugin ever writes to, and
 only in response to an explicit action in the settings view (never
