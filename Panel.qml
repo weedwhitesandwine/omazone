@@ -7,6 +7,34 @@ import "Model.js" as Model
 
 Panel {
   id: root
+
+  // A file this plugin reads but does not own can be anything by the time it
+  // is opened: a link pointing elsewhere, a pipe that never produces anything,
+  // or something far too large. `head` opens a path the ordinary way and would
+  // follow the first and wait forever on the second, inside a shell process
+  // that stays up for days. So the open itself refuses — no links, no waiting,
+  // nothing that is not a plain file — and hands back nothing at all rather
+  // than something over the ceiling.
+  readonly property string safeRead: [
+    'import os, stat, sys',
+    'path = sys.argv[1]; ceiling = int(sys.argv[2])',
+    'try:',
+    '    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)',
+    'except OSError:',
+    '    raise SystemExit',
+    'try:',
+    '    if not stat.S_ISREG(os.fstat(fd).st_mode):',
+    '        raise SystemExit',
+    '    with os.fdopen(fd, "rb") as handle:',
+    '        raw = handle.read(ceiling + 1)',
+    'finally:',
+    '    try:',
+    '        os.close(fd)',
+    '    except OSError:',
+    '        pass',
+    'if len(raw) <= ceiling:',
+    '    sys.stdout.buffer.write(raw)'
+  ].join("\n")
   moduleName: "io.github.weedwhitesandwine.omazone"
   manageIpc: false
 
@@ -110,7 +138,8 @@ Panel {
 
   Process {
     id: settingsReader
-    command: ["head", "-c", String(root.settingsCeiling), "--", root.settingsPath]
+    command: ["python3", "-c", root.safeRead,
+              root.settingsPath, String(root.settingsCeiling)]
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: root.loadSettings(text)
