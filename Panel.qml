@@ -63,6 +63,55 @@ Panel {
   property string editEmoji: ""
   property string editLabel: ""
 
+  // The rows below already say which cities and what time it is there, so the
+  // hero gets to be pleasant instead of repeating the count. Cross-faded on a
+  // timer while the panel is open, cross-faded rather than snapped, which is what
+  // PanelHero's metaOpacity alias exists for.
+  property int phraseIndex: 0
+  readonly property var phrases: [
+    "Somewhere it is Friday",
+    "Meanwhile, elsewhere",
+    "Borrowed hours",
+    "The sun is up somewhere",
+    "Tomorrow, already",
+    "Offsets honoured",
+    "Everyone is awake somewhere",
+    "Jet lag, previewed",
+    "Time is a local custom"
+  ]
+  readonly property var emptyPhrases: [
+    "Nowhere yet",
+    "One clock is enough",
+    "Untravelled"
+  ]
+  readonly property string heroPhrase: {
+    var list = root.zoneIds.length === 0 ? root.emptyPhrases : root.phrases
+    return list[root.phraseIndex % list.length]
+  }
+
+  Timer {
+    id: phraseTimer
+    interval: 2800
+    running: root.opened
+    repeat: true
+    onTriggered: phraseSwap.restart()
+  }
+
+  SequentialAnimation {
+    id: phraseSwap
+    PropertyAnimation {
+      target: hero; property: "metaOpacity"
+      to: 0.0; duration: 180; easing.type: Easing.OutQuad
+    }
+    ScriptAction {
+      script: root.phraseIndex = root.phraseIndex + 1
+    }
+    PropertyAnimation {
+      target: hero; property: "metaOpacity"
+      to: 1.0; duration: 260; easing.type: Easing.InQuad
+    }
+  }
+
   property int travelOffsetMinutes: 0
   property var zoneTimes: ({})
 
@@ -343,7 +392,7 @@ Panel {
           id: hero
           width: parent.width
           title: "Omazone"
-          meta: root.zoneIds.length === 1 ? "1 city" : root.zoneIds.length + " cities"
+          meta: root.heroPhrase
           foreground: root.barForeground
           fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
 
