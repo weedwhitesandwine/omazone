@@ -453,8 +453,17 @@ Panel {
               textFormat: Text.PlainText
               visible: root.zoneIds.length === 0
               width: parent.width
-              text: "No cities yet — add some from Settings (" + "⚙" + ")."
+              // The gear ends the line, with no bracket or full stop after it. Nerd
+              // Font icons are drawn about half a cell wider than they advance, so
+              // whatever follows one is painted underneath it: with the glyph in place,
+              // the "(" + gear + ")." this replaces lost its closing bracket to the
+              // gear's right edge. Ending on the icon is the only fix that does not
+              // depend on which family the bar is set to — the single-width "Nerd Font
+              // Mono" variant is not installed everywhere, and hardcoding a family
+              // would ignore the user's own font setting.
+              text: "No cities yet — add some from Settings \uf013"
               color: Qt.darker(root.barForeground, 1.5)
+              font.family: root.bar ? root.bar.fontFamily : Style.font.family
               font.pixelSize: Style.font.bodySmall
               wrapMode: Text.Wrap
             }
