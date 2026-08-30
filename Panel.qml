@@ -372,7 +372,14 @@ Panel {
     contentWidth: panel.fittedContentWidth(Style.space(360))
     // Settings is the taller of the two views, so the card is given the room
     // when it is showing and stays compact for the clock list.
-    contentHeight: panel.fittedContentHeight(Style.space(root.settingsOpen ? 560 : 460))
+    // Follows the content instead of always asking for a tall card: three cities
+    // should not open the same height as thirty. fittedContentHeight clamps to
+    // the space between the bar and the screen edge, and the cap keeps a long
+    // city list scrolling inside the Flickable rather than filling the display.
+    contentHeight: panel.fittedContentHeight(
+      hero.implicitHeight + Style.space(8)
+        + (root.settingsOpen ? settingsColumn.implicitHeight : mainColumn.implicitHeight),
+      Style.space(620))
 
     PanelKeyCatcher {
       id: keyCatcher
