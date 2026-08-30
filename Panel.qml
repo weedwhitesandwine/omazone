@@ -443,66 +443,6 @@ Panel {
             width: bodyFlick.width
             spacing: Style.space(10)
 
-            PanelSectionHeader { text: "TIME TRAVEL"; foreground: root.barForeground }
-
-            Row {
-              width: parent.width
-              height: Math.max(travelLabel.implicitHeight, nowBtn.implicitHeight)
-
-              Text {
-                textFormat: Text.PlainText
-                id: travelLabel
-                anchors.verticalCenter: parent.verticalCenter
-                text: Model.formatOffset(root.travelOffsetMinutes)
-                color: root.barForeground
-                font.bold: true
-                font.pixelSize: Style.font.body
-              }
-
-              Item {
-                width: parent.width - travelLabel.width - nowBtn.width
-                height: 1
-              }
-
-              PanelActionButton {
-                id: nowBtn
-                anchors.verticalCenter: parent.verticalCenter
-                iconText: "⟲"
-                tooltipText: "Reset to now"
-                foreground: root.barForeground
-                enabled: root.travelOffsetMinutes !== 0
-                onClicked: root.travelOffsetMinutes = 0
-              }
-            }
-
-            PanelSlider {
-              width: parent.width
-              bar: root.bar
-              minimum: -1440
-              maximum: 2880
-              step: 15
-              integer: true
-              value: root.travelOffsetMinutes
-              onMoved: function(v) { root.travelOffsetMinutes = v }
-              onReleased: function(v) { root.travelOffsetMinutes = v; root.refreshTimes() }
-            }
-
-            Text {
-              textFormat: Text.PlainText
-              visible: root.travelOffsetMinutes !== 0
-              width: parent.width
-              text: {
-                var l = root.zoneTimes["__local__"]
-                if (!l || l.date === undefined) return ""
-                return l.weekday + " " + l.date + " · " + (root.use24h ? l.time24 : (l.time12 + " " + l.ampm)) + " your local time"
-              }
-              color: Qt.darker(root.barForeground, 1.4)
-              font.pixelSize: Style.font.caption
-              wrapMode: Text.Wrap
-            }
-
-            PanelSeparator { foreground: root.barForeground }
-
             Text {
               textFormat: Text.PlainText
               visible: root.zoneIds.length === 0
@@ -678,6 +618,67 @@ Panel {
                 }
               }
             }
+
+            PanelSeparator { foreground: root.barForeground }
+
+            PanelSectionHeader { text: "TIME TRAVEL"; foreground: root.barForeground }
+
+            Row {
+              width: parent.width
+              height: Math.max(travelLabel.implicitHeight, nowBtn.implicitHeight)
+
+              Text {
+                textFormat: Text.PlainText
+                id: travelLabel
+                anchors.verticalCenter: parent.verticalCenter
+                text: Model.formatOffset(root.travelOffsetMinutes)
+                color: root.barForeground
+                font.bold: true
+                font.pixelSize: Style.font.body
+              }
+
+              Item {
+                width: parent.width - travelLabel.width - nowBtn.width
+                height: 1
+              }
+
+              PanelActionButton {
+                id: nowBtn
+                anchors.verticalCenter: parent.verticalCenter
+                iconText: "\uf0e2"
+                tooltipText: "Reset to now"
+                foreground: root.barForeground
+                enabled: root.travelOffsetMinutes !== 0
+                onClicked: root.travelOffsetMinutes = 0
+              }
+            }
+
+            PanelSlider {
+              width: parent.width
+              bar: root.bar
+              minimum: -1440
+              maximum: 2880
+              step: 15
+              integer: true
+              value: root.travelOffsetMinutes
+              onMoved: function(v) { root.travelOffsetMinutes = v }
+              onReleased: function(v) { root.travelOffsetMinutes = v; root.refreshTimes() }
+            }
+
+            Text {
+              textFormat: Text.PlainText
+              visible: root.travelOffsetMinutes !== 0
+              width: parent.width
+              text: {
+                var l = root.zoneTimes["__local__"]
+                if (!l || l.date === undefined) return ""
+                return l.weekday + " " + l.date + " · " + (root.use24h ? l.time24 : (l.time12 + " " + l.ampm)) + " your local time"
+              }
+              color: Qt.darker(root.barForeground, 1.4)
+              font.pixelSize: Style.font.caption
+              wrapMode: Text.Wrap
+            }
+
           }
 
           Column {
