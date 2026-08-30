@@ -461,69 +461,108 @@ Panel {
                 required property string modelData
                 readonly property bool editing: root.editingId === modelData
                 width: mainColumn.width
-                height: editing ? Style.space(40) : Style.space(46)
+                // One height for both states: the row used to shrink while being
+                // edited, which shifted every row below it as soon as the pencil
+                // was clicked.
+                height: Style.space(46)
 
-                Row {
+                // Anchored rather than laid out in a Row with a hand-computed
+                // spacer: the actions come and go with hover, and arithmetic
+                // spacers have to be corrected every time something's visibility
+                // changes. Anchors just hold.
+                Item {
                   id: editRow
                   visible: rowItem.editing
-                  width: parent.width
-                  anchors.verticalCenter: parent.verticalCenter
-                  spacing: Style.spacing.xs
+                  anchors.fill: parent
 
                   TextField {
                     id: emojiField
-                    width: Style.space(46)
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    // Matches the icon it replaces, so the field sits where the
+                    // glyph was rather than jumping the label sideways.
+                    width: Style.space(52)
                     text: root.editEmoji
                     foreground: root.barForeground
                     horizontalAlignment: Text.AlignHCenter
                     onTextChanged: root.editEmoji = text
                   }
 
+                  Row {
+                    id: editActions
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 0
+
+                    PanelActionButton {
+                      iconText: "\uf00c"
+                      tooltipText: "Save"
+                      foreground: root.barForeground
+                      onClicked: root.saveEdit()
+                    }
+
+                    PanelActionButton {
+                      iconText: "\uf00d"
+                      tooltipText: "Cancel"
+                      foreground: root.barForeground
+                      onClicked: root.cancelEdit()
+                    }
+                  }
+
                   TextField {
                     id: labelField
-                    width: editRow.width - emojiField.width - saveBtn.width - cancelBtn.width - editRow.spacing * 3
+                    anchors.left: emojiField.right
+                    anchors.leftMargin: Style.spacing.sm
+                    anchors.right: editActions.left
+                    anchors.rightMargin: Style.spacing.sm
+                    anchors.verticalCenter: parent.verticalCenter
                     text: root.editLabel
                     foreground: root.barForeground
                     placeholderText: Model.friendlyName(rowItem.modelData)
                     onTextChanged: root.editLabel = text
-                  }
-
-                  PanelActionButton {
-                    id: saveBtn
-                    iconText: "✓"
-                    tooltipText: "Save"
-                    foreground: root.barForeground
-                    onClicked: root.saveEdit()
-                  }
-
-                  PanelActionButton {
-                    id: cancelBtn
-                    iconText: "✕"
-                    tooltipText: "Cancel"
-                    foreground: root.barForeground
-                    onClicked: root.cancelEdit()
+                    onAccepted: root.saveEdit()
                   }
                 }
 
-                Row {
+                Item {
                   id: normalRow
                   visible: !rowItem.editing
-                  width: parent.width
-                  anchors.verticalCenter: parent.verticalCenter
-                  spacing: Style.spacing.sm
+                  anchors.fill: parent
+
+                  // A HoverHandler rather than a MouseArea: PanelActionButton has
+                  // its own MouseArea, and a plain hover area underneath would
+                  // report false the moment the pointer reached a button — the
+                  // actions would fade out as you moved towards them.
+                  HoverHandler {
+                    id: rowHover
+                  }
 
                   Row {
                     id: leftBlock
+                    anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: Style.spacing.sm
 
+                    // Sized to the label block beside it rather than to the body
+                    // font, so a flag or glyph reads at a glance instead of
+                    // sitting smaller than the city name it belongs to. The
+                    // height comes from the labels, so the row does not grow.
                     Text {
                       textFormat: Text.PlainText
+                      anchors.verticalCenter: parent.verticalCenter
+                      width: labelColumn.implicitHeight
+                      height: labelColumn.implicitHeight
                       text: root.zoneIcon(rowItem.modelData)
-                      font.pixelSize: Style.font.subtitle
+                      font.family: root.bar ? root.bar.fontFamily : Style.font.family
+                      font.pixelSize: Math.round(labelColumn.implicitHeight * 0.82)
+                      fontSizeMode: Text.Fit
+                      minimumPixelSize: Style.font.caption
+                      horizontalAlignment: Text.AlignHCenter
+                      verticalAlignment: Text.AlignVCenter
                     }
 
                     Column {
+                      id: labelColumn
                       anchors.verticalCenter: parent.verticalCenter
                       spacing: 2
 
@@ -532,25 +571,22 @@ Panel {
                         text: root.zoneLabel(rowItem.modelData)
                         color: root.barForeground
                         font.bold: true
+                        font.family: root.bar ? root.bar.fontFamily : Style.font.family
                         font.pixelSize: Style.font.body
                       }
                       Text {
                         textFormat: Text.PlainText
                         text: Model.regionName(rowItem.modelData)
                         color: Qt.darker(root.barForeground, 1.5)
+                        font.family: root.bar ? root.bar.fontFamily : Style.font.family
                         font.pixelSize: Style.font.caption
                       }
                     }
                   }
 
-                  Item {
-                    id: spacerItem
-                    width: Math.max(0, normalRow.width - leftBlock.width - timeBlock.width - actionsBlock.width - normalRow.spacing * 3)
-                    height: 1
-                  }
-
                   Column {
                     id: timeBlock
+                    anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 2
 
@@ -563,6 +599,7 @@ Panel {
                         text: root.zoneTimeText(rowItem.modelData)
                         color: root.barForeground
                         font.bold: true
+                        font.family: root.bar ? root.bar.fontFamily : Style.font.family
                         font.pixelSize: Style.font.subtitle
                       }
                       Text {
@@ -571,6 +608,7 @@ Panel {
                         text: root.zoneBadge(rowItem.modelData)
                         color: Color.accent
                         font.bold: true
+                        font.family: root.bar ? root.bar.fontFamily : Style.font.family
                         font.pixelSize: Style.font.caption
                       }
                     }
@@ -580,35 +618,56 @@ Panel {
                       anchors.right: parent.right
                       text: root.zoneSubText(rowItem.modelData)
                       color: Qt.darker(root.barForeground, 1.5)
+                      font.family: root.bar ? root.bar.fontFamily : Style.font.family
                       font.pixelSize: Style.font.caption
                     }
                   }
 
+                  // Reorder, edit and remove live to the left of the time and only
+                  // while the row is hovered. They are always laid out, just
+                  // transparent, so the time does not shift when they appear, and
+                  // disabled while hidden so an invisible button cannot be clicked.
                   Row {
                     id: actionsBlock
+                    anchors.right: timeBlock.left
+                    anchors.rightMargin: Style.spacing.md
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 0
+                    // Either handler keeps them up: PanelActionButton owns a
+                    // MouseArea, and if that consumed the hover the row handler
+                    // would drop as the pointer arrived — the buttons would fade
+                    // out from under the click.
+                    opacity: (rowHover.hovered || actionsHover.hovered) ? 1.0 : 0.0
+                    enabled: rowHover.hovered || actionsHover.hovered
+
+                    HoverHandler {
+                      id: actionsHover
+                    }
+
+                    Behavior on opacity {
+                      NumberAnimation { duration: 120; easing.type: Easing.OutQuad }
+                    }
 
                     PanelActionButton {
-                      iconText: "↑"
+                      iconText: "\uf062"
                       tooltipText: "Move up"
                       foreground: root.barForeground
                       onClicked: root.moveZone(rowItem.modelData, -1)
                     }
                     PanelActionButton {
-                      iconText: "↓"
+                      iconText: "\uf063"
                       tooltipText: "Move down"
                       foreground: root.barForeground
                       onClicked: root.moveZone(rowItem.modelData, 1)
                     }
                     PanelActionButton {
-                      iconText: "✎"
+                      iconText: "\uf040"
                       tooltipText: "Edit icon & label"
                       foreground: root.barForeground
                       onClicked: root.beginEdit(rowItem.modelData)
                     }
                     PanelActionButton {
-                      iconText: "✕"
+                      iconText: "\uf00d"
                       tooltipText: "Remove"
                       foreground: root.barForeground
                       hoverColor: Color.urgent
