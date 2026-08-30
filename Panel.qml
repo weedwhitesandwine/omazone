@@ -563,6 +563,7 @@ Panel {
                     // sitting smaller than the city name it belongs to. The
                     // height comes from the labels, so the row does not grow.
                     Text {
+                      id: zoneIconText
                       textFormat: Text.PlainText
                       anchors.verticalCenter: parent.verticalCenter
                       width: labelColumn.implicitHeight
@@ -576,13 +577,23 @@ Panel {
                       verticalAlignment: Text.AlignVCenter
                     }
 
+                    // Stops where the actions begin, and elides rather than
+                    // running on. A label is whatever the user typed into the
+                    // edit field, or whatever a restored settings.json holds, so
+                    // there is no length to design for: unbounded, it painted
+                    // underneath the time column. The actions are always laid
+                    // out — only their opacity changes on hover — so this width
+                    // is the same hovered or not and the labels never reflow.
                     Column {
                       id: labelColumn
                       anchors.verticalCenter: parent.verticalCenter
                       spacing: 2
+                      width: Math.max(0, actionsBlock.x - zoneIconText.width - leftBlock.spacing)
 
                       Text {
                         textFormat: Text.PlainText
+                        width: parent.width
+                        elide: Text.ElideRight
                         text: root.zoneLabel(rowItem.modelData)
                         color: root.barForeground
                         font.bold: true
@@ -591,6 +602,8 @@ Panel {
                       }
                       Text {
                         textFormat: Text.PlainText
+                        width: parent.width
+                        elide: Text.ElideRight
                         text: Model.regionName(rowItem.modelData)
                         color: Qt.darker(root.barForeground, 1.5)
                         font.family: root.bar ? root.bar.fontFamily : Style.font.family

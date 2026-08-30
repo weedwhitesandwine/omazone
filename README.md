@@ -5,7 +5,7 @@ from a bar icon. Track any number of cities, each with its own icon and
 label, and drag the Time Travel slider to see what time it'll be everywhere
 at once.
 
-![Omazone open, showing four tracked cities](preview.png)
+![Omazone open, showing five tracked cities and the Time Travel slider](preview.png)
 
 ## Features
 
@@ -38,7 +38,9 @@ omarchy bar move io.github.weedwhitesandwine.omazone --section left
 ```
 
 The Settings buttons run exactly that `omarchy bar move` command, so the shell
-makes the change to its own layout.
+makes the change to its own layout. None of the three starts selected: the
+panel cannot see where the bar actually put the icon, so it claims nothing
+until you press one.
 
 Add a keybind, e.g. in `~/.config/hypr/bindings.lua`:
 
@@ -66,8 +68,9 @@ tracked cities and settings stay on disk at
 - Click the gear icon (top-right of the panel) to open settings:
   - **Cities** — search and check off any number of timezones to track.
   - **Format** — 12-hour or 24-hour time.
-- On each city row: `↑`/`↓` reorder it, `✎` edit its icon and label, `✕`
-  removes it.
+- Hover a city row and its controls fade in to the left of the time: `↑`/`↓`
+  reorder it, the pencil edits its icon and label, `✕` removes it. They are
+  always laid out, so nothing shifts as they appear.
 - The Time Travel slider ranges from 24 hours in the past to 48 hours
   ahead. The reset icon next to it jumps back to now.
 
@@ -94,6 +97,14 @@ show or hide the bar icon from the settings view.
 - `~/.local/state/omarchy/omazone/settings.json` — tracked cities, their
   custom icons/labels and the 12/24-hour preference. Created on
   first change; starts empty until you add cities from Settings.
+
+## Credits
+
+The panel's Omarchy look — the hero header, the hover row controls, the
+content-sized card and the theme-following glyphs — was contributed by
+[@CtByte](https://github.com/CtByte).
+
+Built with [Claude Code](https://claude.com/claude-code).
 
 ## License
 
