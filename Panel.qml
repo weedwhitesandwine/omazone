@@ -55,7 +55,13 @@ Panel {
   property var zoneIds: []
   property var zoneMeta: ({})
   property bool use24h: true
-  property string barSection: "right"
+  // No default placement, and deliberately not upstream's "right": the panel
+  // cannot see where the bar actually put this widget, so any preselected
+  // button is a guess presented as fact — it read "Right" while the icon sat
+  // in the centre. Empty means "not known here", which borders no button and
+  // claims nothing. A real value only ever arrives from a press, or from a
+  // press this panel saved earlier.
+  property string barSection: ""
   property bool settingsLoaded: false
 
   property bool settingsOpen: false
