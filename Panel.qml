@@ -335,40 +335,42 @@ Panel {
       Item {
         anchors.fill: parent
 
-        Row {
-          id: headerRow
+        // Ui/PanelHero rather than a hand-built title row: it owns the icon,
+        // title, meta line and trailing control, so this panel opens looking like
+        // every other one instead of nearly like them. The gear moves into the
+        // hero's trailingControl slot, which centres it against the labels.
+        PanelHero {
+          id: hero
           width: parent.width
-          height: Math.max(titleText.implicitHeight, gearBtn.implicitHeight)
+          title: "Omazone"
+          meta: root.zoneIds.length === 1 ? "1 city" : root.zoneIds.length + " cities"
+          foreground: root.barForeground
+          fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
 
-          Text {
-            textFormat: Text.PlainText
-            id: titleText
-            anchors.verticalCenter: parent.verticalCenter
-            text: "Omazone"
-            color: root.barForeground
-            font.bold: true
-            font.family: root.bar ? root.bar.fontFamily : Style.font.family
-            font.pixelSize: Style.font.subtitle
+          iconComponent: Component {
+            Text {
+              textFormat: Text.PlainText
+              text: "\uf0ac"
+              color: root.barForeground
+              font.family: root.bar ? root.bar.fontFamily : Style.font.family
+              font.pixelSize: Style.font.display
+              renderType: Text.NativeRendering
+            }
           }
 
-          Item {
-            width: headerRow.width - titleText.width - gearBtn.width
-            height: 1
-          }
-
-          PanelActionButton {
-            id: gearBtn
-            anchors.verticalCenter: parent.verticalCenter
-            iconText: root.settingsOpen ? "✕" : "󰒓"
-            tooltipText: root.settingsOpen ? "Back to cities" : "Settings"
-            foreground: root.barForeground
-            onClicked: root.settingsOpen = !root.settingsOpen
+          trailingControl: Component {
+            PanelActionButton {
+              iconText: root.settingsOpen ? "\uf00d" : "\uf013"
+              tooltipText: root.settingsOpen ? "Back to cities" : "Settings"
+              foreground: root.barForeground
+              onClicked: root.settingsOpen = !root.settingsOpen
+            }
           }
         }
 
         Flickable {
           id: bodyFlick
-          anchors.top: headerRow.bottom
+          anchors.top: hero.bottom
           anchors.topMargin: Style.space(8)
           anchors.left: parent.left
           anchors.right: parent.right
