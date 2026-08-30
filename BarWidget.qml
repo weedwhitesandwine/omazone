@@ -55,7 +55,10 @@ BarWidget {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: "🌐"
+    // A glyph from the bar font rather than an emoji: an emoji is drawn from a
+    // colour font, so it ignores `color` and keeps its own shade on every theme
+    // while every neighbouring icon follows the bar foreground.
+    text: "\uf0ac"
     tooltipText: "Omazone"
     fixedWidth: root.bar && root.bar.vertical ? -1 : Style.space(27)
     fixedHeight: root.bar && root.bar.vertical ? Style.space(26) : -1
